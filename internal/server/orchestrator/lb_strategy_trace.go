@@ -8,16 +8,18 @@ import (
 	"github.com/looplj/axonhub/internal/server/biz"
 )
 
+const defaultTraceAwareBoostScore = 150.0
+
 // ChannelTraceProvider provides trace-related channel information.
 type ChannelTraceProvider interface {
 	GetLastSuccessfulChannelID(ctx context.Context, traceID int) (int, error)
 }
 
-// TraceAwareStrategy prioritizes the last successful channel from the trace context.
-// If a trace ID exists and has a last successful channel, that channel gets maximum score.
+// TraceAwareStrategy mildly prefers the last successful channel from the trace context.
+// Health-aware strategies should still be able to move traffic away after failures.
 type TraceAwareStrategy struct {
 	traceProvider ChannelTraceProvider
-	// Score boost for the last successful channel (default: 1000)
+	// Score boost for the last successful channel.
 	boostScore float64
 }
 
@@ -25,7 +27,7 @@ type TraceAwareStrategy struct {
 func NewTraceAwareStrategy(traceProvider ChannelTraceProvider) *TraceAwareStrategy {
 	return &TraceAwareStrategy{
 		traceProvider: traceProvider,
-		boostScore:    1000.0,
+		boostScore:    defaultTraceAwareBoostScore,
 	}
 }
 

@@ -60,8 +60,8 @@ func TestErrorAwareStrategy_Score_WithMockConsecutiveFailures(t *testing.T) {
 	}
 
 	score := strategy.Score(ctx, channel)
-	// Base 200 - 40 - (3 * 30) = 70
-	assert.Equal(t, 70.0, score)
+	// Base 200 - 120 - (3 * 80) clamps to 0.
+	assert.Equal(t, 0.0, score)
 }
 
 func TestErrorAwareStrategy_Score_WithMockRecentSuccess(t *testing.T) {
@@ -128,9 +128,8 @@ func TestErrorAwareStrategy_Score_ConsecutiveFailures(t *testing.T) {
 
 	score := strategy.Score(ctx, channel)
 
-	// Should have significant penalty for 3 consecutive failures
-	// Base 200 - 40 - (3 * 30) = 70
-	assert.Less(t, score, 100.0, "Score should be penalized for consecutive failures")
+	// Should have strong penalty for 3 consecutive failures.
+	assert.Equal(t, 0.0, score, "Score should be clamped to 0 for repeated recent failures")
 }
 
 func TestErrorAwareStrategy_Score_RecentSuccess(t *testing.T) {

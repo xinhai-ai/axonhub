@@ -30,30 +30,30 @@ The load balancing system uses the Strategy pattern to make the prioritization l
 
 ## Built-in Strategies
 
-### 1. TraceAwareStrategy (Priority: up to 1000 points)
+### 1. TraceAwareStrategy (Priority: up to 150 points)
 
 **Purpose**: Sticky routing for conversational consistency.
 
 **Algorithm**:
 1. Reads trace metadata from context (if debug or upstream provided it).
 2. Queries the last successful channel ID for that trace.
-3. If the current channel matches, assigns the full boost (`boostScore`, default 1000); otherwise returns 0.
+3. If the current channel matches, assigns the full boost (`boostScore`, default 150); otherwise returns 0.
 
 **Pros**:
-- Guarantees that multi-turn conversations stay on the channel that already succeeded, minimizing latency spikes from re-initialization.
+- Mildly prefers the channel that already succeeded, minimizing avoidable channel switches while still letting health signals win.
 - Zero-cost when no trace information exists (strategy returns 0 quickly).
 
 **Cons**:
 - Requires trace propagation and persistence; no benefit if upstream systems omit trace IDs.
-- Can over-prefer a channel that is about to degrade until ErrorAwareStrategy pulls it down.
+- Does not force stickiness: recent failures can outweigh the trace boost and move traffic to healthier channels.
 
 ### 2. ErrorAwareStrategy (Priority: 0-200 points)
 
 **Purpose**: Deprioritizes channels based on their recent error history.
 
 **Scoring Factors**:
-- **Consecutive Failures**: -30 points per consecutive failure (decayed linearly over the cooldown period)
-- **Recent Failure**: A base penalty of -40 (decayed linearly over the cooldown period)
+- **Consecutive Failures**: -80 points per consecutive failure (decayed linearly over the cooldown period)
+- **Recent Failure**: A base penalty of -120 (decayed linearly over the cooldown period)
 - **Base Score**: 200 points (for healthy channels)
 
 **Use Case**: Avoids channels experiencing issues and promotes reliable channels by penalizing failures without permanent stigmatization.
@@ -124,18 +124,18 @@ loadBalancer := NewLoadBalancer(
 )
 ```
 
-**Total Score Range**: ~-9790-1530 points per channel (Trace 0-1000 + Error 0-200 + WeightRoundRobin 10-150 + Latency 0-80 + RateLimit -10000-100)
+**Total Score Range**: ~-9470-680 points per channel (Trace 0-150 + Error 0-200 + WeightRoundRobin 10-150 + Latency 0-80 + RateLimit -10000-100)
 
 ### Default Strategy Mix Analysis
 
 **Strengths**:
-1. **Stability first** – TraceAware+ErrorAware ensures the channel that already worked stays on top *unless* it begins to fail.
+1. **Health first** – TraceAware keeps a mild conversation preference, while ErrorAware can move traffic away quickly when that channel begins to fail.
 2. **Fair utilization** – WeightRoundRobin keeps new or idle channels active without ignoring business priorities.
 3. **Real-time protection** – LatencyAware and RateLimitAware react to live first-token latency, throughput, end-to-end latency, concurrency, and cooldown state before a channel is fully overloaded.
 
 **Trade-offs**:
 1. Requires multiple runtime signals (trace, metrics, request history, connections); missing data downgrades overall accuracy.
-2. Score magnitudes are very top-heavy (TraceAware dominates). When no trace exists, the remaining strategies must differentiate channels with far smaller numbers, so tuning their ranges matters.
+2. Trace stickiness is intentionally limited; repeated failures should outweigh trace preference before a bad channel dominates a conversation.
 3. Concurrency protection depends on accurate connection tracking and sensible `MaxConcurrent` or tracker capacities.
 
 ## Scoring Example
@@ -144,12 +144,12 @@ Given 3 channels for a traced request with connection limits:
 
 | Channel | Trace Match | Consecutive Failures | Request Load | Weight | Utilization | Total Score | Rank |
 |---------|-------------|----------------------|--------------|--------|-------------|-------------|------|
-| A       | Yes         | 0                    | Near 0       | 80     | 20%         | 1390        | 1    |
+| A       | Yes         | 0                    | Near 0       | 80     | 20%         | 540         | 1    |
 | C       | No          | 0                    | Low          | 50     | 20%         | 430         | 2    |
 | B       | No          | 1                    | High         | 100    | 90%         | 210         | 3    |
 
 **Calculation**:
-- Channel A: 1000 (trace) + 200 (healthy) + 150 (round robin) + 40 (weight) + 40 (connection) ≈ **1390**
+- Channel A: 150 (trace) + 200 (healthy) + 150 (round robin) + 40 (connection/latency signals) ≈ **540**
 - Channel C: 0 (trace) + 200 + 120 (round robin) + 25 (weight) + 40 (connection) ≈ **385** (rounded to 430 after other boosts)
 - Channel B: 0 (trace) + 150 (health, -50 failure penalty) + 30 (round robin due to high load) + 50 (weight) + 5 (connection) ≈ **235** (rounded to 210 after cooldown penalty)
 
@@ -186,7 +186,7 @@ The load balancer provides comprehensive structured logging for debugging and mo
   "final_rank": 1,
   "strategy_breakdown": {
     "TraceAware": {
-      "score": 1000.0,
+      "score": 150.0,
       "duration_ms": 2.1
     },
     "ErrorAware": {
@@ -257,7 +257,7 @@ if info := chat.GetDebugInfo(ctx); info != nil {
 ### Strategy-Specific Logs
 
 **TraceAwareStrategy** logs:
-- Debug: When boosting a channel (score: 1000, reason: "last_successful_channel_in_trace")
+- Debug: When boosting a channel (score: 150, reason: "last_successful_channel_in_trace")
 - Trace: When no trace in context or channel not in trace
 - Debug: Errors retrieving trace information
 

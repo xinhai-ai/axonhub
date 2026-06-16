@@ -58,7 +58,7 @@ func TestTraceAwareStrategy_Score_WithMockTrace(t *testing.T) {
 	}
 
 	score := strategy.Score(ctx, channel)
-	assert.Equal(t, 1000.0, score, "Should return max boost for last successful channel")
+	assert.Equal(t, defaultTraceAwareBoostScore, score, "Should return trace boost for last successful channel")
 }
 
 func TestTraceAwareStrategy_Score_WithMockDifferentChannel(t *testing.T) {
@@ -136,7 +136,7 @@ func TestTraceAwareStrategy_Score_WithLastSuccessChannel(t *testing.T) {
 	channel := &biz.Channel{Channel: ch}
 
 	score := strategy.Score(ctx, channel)
-	assert.Equal(t, 1000.0, score, "Should return max boost for last successful channel")
+	assert.Equal(t, defaultTraceAwareBoostScore, score, "Should return trace boost for last successful channel")
 }
 
 func TestTraceAwareStrategy_Score_DifferentChannel(t *testing.T) {

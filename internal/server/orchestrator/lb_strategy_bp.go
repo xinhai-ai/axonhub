@@ -8,6 +8,13 @@ import (
 	"github.com/looplj/axonhub/internal/server/biz"
 )
 
+const (
+	defaultErrorAwareMaxScore                     = 200.0
+	defaultErrorAwareBasePenalty                  = 120.0
+	defaultErrorAwarePenaltyPerConsecutiveFailure = 80.0
+	defaultErrorAwareCooldownMinutes              = 5
+)
+
 // ErrorAwareStrategy deprioritizes channels based on their recent error history.
 // It calculates a health score by applying time-decayed penalties for failures.
 //
@@ -19,17 +26,17 @@ import (
 // quickly after a period of instability, as long as they are currently working.
 //
 // Penalties applied:
-//   - Consecutive failures: -30 per failure, decaying linearly over the cooldown period.
-//   - Recent failure: A base penalty of -40 that decays linearly over the cooldown period.
+//   - Consecutive failures: -80 per failure, decaying linearly over the cooldown period.
+//   - Recent failure: A base penalty of -120 that decays linearly over the cooldown period.
 type ErrorAwareStrategy struct {
 	metricsProvider ChannelMetricsProvider
-	// maxScore is the maximum score for a perfectly healthy channel (default: 200)
+	// maxScore is the maximum score for a perfectly healthy channel.
 	maxScore float64
-	// basePenalty is the base penalty for any recent failure (default: 40)
+	// basePenalty is the base penalty for any recent failure.
 	basePenalty float64
-	// penaltyPerConsecutiveFailure is the score penalty per consecutive failure (default: 30)
+	// penaltyPerConsecutiveFailure is the score penalty per consecutive failure.
 	penaltyPerConsecutiveFailure float64
-	// errorCooldownMinutes is how long to remember errors (default: 5 minutes)
+	// errorCooldownMinutes is how long to remember errors.
 	errorCooldownMinutes int
 }
 
@@ -37,10 +44,10 @@ type ErrorAwareStrategy struct {
 func NewErrorAwareStrategy(metricsProvider ChannelMetricsProvider) *ErrorAwareStrategy {
 	return &ErrorAwareStrategy{
 		metricsProvider:              metricsProvider,
-		maxScore:                     200.0,
-		basePenalty:                  40.0,
-		penaltyPerConsecutiveFailure: 30.0,
-		errorCooldownMinutes:         5,
+		maxScore:                     defaultErrorAwareMaxScore,
+		basePenalty:                  defaultErrorAwareBasePenalty,
+		penaltyPerConsecutiveFailure: defaultErrorAwarePenaltyPerConsecutiveFailure,
+		errorCooldownMinutes:         defaultErrorAwareCooldownMinutes,
 	}
 }
 
@@ -205,4 +212,3 @@ func (s *ErrorAwareStrategy) ScoreWithDebug(ctx context.Context, channel *biz.Ch
 func (s *ErrorAwareStrategy) Name() string {
 	return "ErrorAware"
 }
-
