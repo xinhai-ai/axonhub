@@ -492,8 +492,8 @@ func TestLoadBalancer_TraceAware_SameChannelPrioritized(t *testing.T) {
 	assert.Equal(t, ch2.ID, result[0].Channel.ID, "Channel from trace should be ranked first")
 }
 
-// TestLoadBalancer_Combined_ErrorAndTrace tests the combined behavior of
-// error-aware and trace-aware strategies.
+// TestLoadBalancer_Combined_ErrorAndTrace tests that recent failures can
+// outweigh trace stickiness, allowing healthy channels to take over quickly.
 func TestLoadBalancer_Combined_ErrorAndTrace(t *testing.T) {
 	ctx := context.Background()
 	ctx = authz.WithTestBypass(ctx)
@@ -592,11 +592,10 @@ func TestLoadBalancer_Combined_ErrorAndTrace(t *testing.T) {
 	result := lb.Sort(ctx, candidates, "", false)
 	require.Len(t, result, 3)
 
-	// ch2 should still be ranked first because trace boost (1000) outweighs error penalty
-	// TraceAware gives +1000, ErrorAware gives penalty (around -100 to -150), Weight gives +50
-	// Net score for ch2: ~900-950
-	// ch1 and ch3: ErrorAware ~200, Weight ~50 = ~250
-	assert.Equal(t, ch2.ID, result[0].Channel.ID, "Trace channel should be first despite errors (trace boost is stronger)")
+	// The trace channel has recent consecutive failures. Trace stickiness should
+	// be only a mild preference, so a healthy channel with the same weight wins.
+	assert.NotEqual(t, ch2.ID, result[0].Channel.ID, "Healthy channel should outrank a failing trace channel")
+	assert.Contains(t, []int{ch1.ID, ch3.ID}, result[0].Channel.ID, "Top channel should be one of the healthy candidates")
 }
 
 // mockSystemService is a test mock for SystemService.

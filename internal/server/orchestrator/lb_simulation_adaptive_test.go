@@ -234,7 +234,7 @@ func TestAdaptiveLoadBalancer_Simulation_Healthy_DistributionByWeight(t *testing
 	}
 }
 
-func TestAdaptiveLoadBalancer_Simulation_TraceStickyOverridesWeight(t *testing.T) {
+func TestAdaptiveLoadBalancer_Simulation_TraceStickyMildlyOverridesWeight(t *testing.T) {
 	baseCtx := context.Background()
 	trace := &ent.Trace{ID: 1}
 	ctx := contexts.WithTrace(baseCtx, trace)
@@ -336,9 +336,8 @@ func TestAdaptiveLoadBalancer_Simulation_ErrorMigrationAndRecovery(t *testing.T)
 
 	failingID := candidates[0].Channel.ID
 
-	// Record 3 failures
-	// Penalty: 40 (base) + 3 * 30 (consecutive) = 130
-	// ErrorAware Score: 200 - 130 = 70
+	// Record 3 failures.
+	// Penalty: 120 (base) + 3 * 80 (consecutive) clamps the ErrorAware score to 0.
 	for range 3 {
 		metrics.AdvanceMs(tickMs)
 		metrics.RecordFailure(failingID)
@@ -356,8 +355,8 @@ func TestAdaptiveLoadBalancer_Simulation_ErrorMigrationAndRecovery(t *testing.T)
 
 	// Wait 2.5 minutes (half of 5 min cooldown)
 	// cooldownRatio = 0.5
-	// Penalty = 130 * 0.5 = 65
-	// ErrorAware Score: 200 - 65 = 135
+	// Penalty = (120 + 3 * 80) * 0.5 = 180
+	// ErrorAware Score: 200 - 180 = 20
 	// Healthy channels ErrorAware Score: 200
 	// Even though it's recovering, healthy channels still have higher score.
 	metrics.AdvanceMs(2*60*1000 + 30*1000)
@@ -411,10 +410,10 @@ func TestAdaptiveLoadBalancer_Simulation_ErrorAware_DetailedDecay(t *testing.T) 
 	ch2 := candidates[1].Channel.ID
 
 	// 1. ch1 fails 2 times
-	// Penalty: 40 + 2 * 30 = 100
-	// ErrorAware Score: 200 - 100 = 100
+	// Penalty: 120 + 2 * 80 = 280, clamped to 0
+	// ErrorAware Score: 0
 	// WRR Score: 150
-	// Total: 250
+	// Total: 150
 	// ch2 Total: 200 + 150 = 350
 	for range 2 {
 		metrics.RecordFailure(ch1)
@@ -429,15 +428,15 @@ func TestAdaptiveLoadBalancer_Simulation_ErrorAware_DetailedDecay(t *testing.T) 
 
 	// 2. Advance 4 minutes (80% of 5 min cooldown)
 	// cooldownRatio = 1.0 - (4/5) = 0.2
-	// Penalty = 100 * 0.2 = 20
-	// ErrorAware Score: 200 - 20 = 180
+	// Penalty = (120 + 2 * 80) * 0.2 = 56
+	// ErrorAware Score: 200 - 56 = 144
 	metrics.AdvanceMs(4 * 60 * 1000)
 
 	// ch2 has 10 requests.
 	// WRR Score for ch2: 150 * exp(-10/150) = 150 * 0.935 = 140
 	// ch2 Total: 200 + 140 = 340
-	// ch1 Total: 180 + 150 = 330
-	// ch2 should still be picked (barely)
+	// ch1 Total: 144 + 150 = 294
+	// ch2 should still be picked
 	sorted := lb.Sort(ctx, candidates, "gpt-4", false)
 	require.Equal(t, ch2, sorted[0].Channel.ID)
 
