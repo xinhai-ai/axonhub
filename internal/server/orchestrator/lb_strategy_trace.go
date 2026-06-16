@@ -8,7 +8,7 @@ import (
 	"github.com/looplj/axonhub/internal/server/biz"
 )
 
-const defaultTraceAwareBoostScore = 150.0
+const defaultTraceAwareBoostScore = 200.0
 
 // ChannelTraceProvider provides trace-related channel information.
 type ChannelTraceProvider interface {
