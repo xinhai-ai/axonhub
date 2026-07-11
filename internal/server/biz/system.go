@@ -212,6 +212,13 @@ type QuotaEnforcementSettings struct {
 type SecuritySettings struct {
 	// BlockedIPs contains IP addresses or CIDR ranges that cannot use external APIs.
 	BlockedIPs []string `json:"blocked_ips"`
+	// ShowRequestLogIPBanIcon controls whether the request log IP column shows the quick ban action.
+	ShowRequestLogIPBanIcon bool `json:"show_request_log_ip_ban_icon"`
+}
+
+type securitySettingsJSON struct {
+	BlockedIPs              []string `json:"blocked_ips"`
+	ShowRequestLogIPBanIcon *bool    `json:"show_request_log_ip_ban_icon"`
 }
 
 // BackupFrequency represents how often automatic backups should run.
@@ -287,6 +294,9 @@ const (
 	// LoadBalancerStrategyCircuitBreaker is a dynamic load balancer strategy that monitors the health of channels and fails over to a backup channel when the primary channel is unhealthy.
 	LoadBalancerStrategyCircuitBreaker = "circuit-breaker"
 
+	// LoadBalancerStrategyRoundRobin is a simple load balancer strategy that rotates channels based on historical request counts.
+	LoadBalancerStrategyRoundRobin = "round-robin"
+
 	// UpstreamErrorModePassthrough keeps provider errors unchanged.
 	UpstreamErrorModePassthrough = "passthrough"
 
@@ -316,7 +326,7 @@ type RetryPolicy struct {
 	// Set to 0 to disable. Values above 600 seconds are clamped.
 	NonStreamResponseTimeoutSeconds int `json:"non_stream_response_timeout_seconds"`
 	// LoadBalancerStrategy defines which channel load balancer strategy to use.
-	// Supported values: "adaptive", "failover", "circuit-breaker".
+	// Supported values: "adaptive", "failover", "circuit-breaker", "round-robin".
 	LoadBalancerStrategy string `json:"load_balancer_strategy"`
 
 	// AutoDisableChannel controls whether to auto-disable a channel or API key when it exceeds the maximum number of retries.
@@ -1588,9 +1598,15 @@ func (s *SystemService) SecuritySettings(ctx context.Context) (*SecuritySettings
 		return nil, fmt.Errorf("failed to get security settings: %w", err)
 	}
 
-	var settings SecuritySettings
-	if err := json.Unmarshal([]byte(value), &settings); err != nil {
+	var storedSettings securitySettingsJSON
+	if err := json.Unmarshal([]byte(value), &storedSettings); err != nil {
 		return nil, fmt.Errorf("failed to unmarshal security settings: %w", err)
+	}
+
+	settings := defaultSecuritySettings
+	settings.BlockedIPs = storedSettings.BlockedIPs
+	if storedSettings.ShowRequestLogIPBanIcon != nil {
+		settings.ShowRequestLogIPBanIcon = *storedSettings.ShowRequestLogIPBanIcon
 	}
 
 	normalizeSecuritySettings(&settings)

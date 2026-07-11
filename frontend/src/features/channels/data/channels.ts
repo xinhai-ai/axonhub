@@ -28,6 +28,8 @@ import {
   channelModelPriceSchema,
   TestChannelAPIKeysPayload,
   testChannelAPIKeysPayloadSchema,
+  TestAPIKeyResult,
+  testAPIKeyResultSchema,
 } from './schema';
 
 const QUERY_CHANNEL_NAMES_QUERY = `
@@ -101,6 +103,7 @@ const CREATE_CHANNEL_MUTATION = `
           forceArrayInstructions
           forceArrayInputs
           replaceDeveloperRoleWithSystem
+          reasoningEffortMapping { from to }
         }
         passThroughUserAgent
         passThroughBody
@@ -108,6 +111,12 @@ const CREATE_CHANNEL_MUTATION = `
         retryableErrorPatterns {
           pattern
           regex
+        }
+        providerQuota {
+          opencodeGo {
+            workspaceId
+            authCookie
+          }
         }
       }
       orderingWeight
@@ -167,6 +176,7 @@ const DUPLICATE_CHANNEL_MUTATION = `
           forceArrayInstructions
           forceArrayInputs
           replaceDeveloperRoleWithSystem
+          reasoningEffortMapping { from to }
         }
         passThroughUserAgent
         passThroughBody
@@ -174,6 +184,12 @@ const DUPLICATE_CHANNEL_MUTATION = `
         retryableErrorPatterns {
           pattern
           regex
+        }
+        providerQuota {
+          opencodeGo {
+            workspaceId
+            authCookie
+          }
         }
       }
       orderingWeight
@@ -233,6 +249,7 @@ const BULK_CREATE_CHANNELS_MUTATION = `
           forceArrayInstructions
           forceArrayInputs
           replaceDeveloperRoleWithSystem
+          reasoningEffortMapping { from to }
         }
         passThroughUserAgent
         passThroughBody
@@ -240,6 +257,12 @@ const BULK_CREATE_CHANNELS_MUTATION = `
         retryableErrorPatterns {
           pattern
           regex
+        }
+        providerQuota {
+          opencodeGo {
+            workspaceId
+            authCookie
+          }
         }
       }
       orderingWeight
@@ -299,6 +322,7 @@ const UPDATE_CHANNEL_MUTATION = `
           forceArrayInstructions
           forceArrayInputs
           replaceDeveloperRoleWithSystem
+          reasoningEffortMapping { from to }
         }
         passThroughUserAgent
         passThroughBody
@@ -306,6 +330,12 @@ const UPDATE_CHANNEL_MUTATION = `
         retryableErrorPatterns {
           pattern
           regex
+        }
+        providerQuota {
+          opencodeGo {
+            workspaceId
+            authCookie
+          }
         }
       }
       orderingWeight
@@ -423,6 +453,18 @@ const TEST_CHANNEL_API_KEYS_MUTATION = `
   }
 `;
 
+const TEST_CHANNEL_API_KEY_MUTATION = `
+  mutation TestChannelAPIKey($channelID: ID!, $key: String!, $modelID: String) {
+    testChannelAPIKey(channelID: $channelID, key: $key, modelID: $modelID) {
+      keyPrefix
+      success
+      latency
+      error
+      disabled
+    }
+  }
+`;
+
 const BULK_IMPORT_CHANNELS_MUTATION = `
   mutation BulkImportChannels($input: BulkImportChannelsInput!) {
     bulkImportChannels(input: $input) {
@@ -470,6 +512,7 @@ const BULK_IMPORT_CHANNELS_MUTATION = `
             forceArrayInstructions
             forceArrayInputs
             replaceDeveloperRoleWithSystem
+            reasoningEffortMapping { from to }
           }
           passThroughUserAgent
           passThroughBody
@@ -477,6 +520,12 @@ const BULK_IMPORT_CHANNELS_MUTATION = `
           retryableErrorPatterns {
             pattern
             regex
+          }
+          providerQuota {
+            opencodeGo {
+              workspaceId
+              authCookie
+            }
           }
         }
       }
@@ -661,6 +710,7 @@ const BULK_UPDATE_CHANNEL_ORDERING_MUTATION = `
             forceArrayInstructions
             forceArrayInputs
             replaceDeveloperRoleWithSystem
+            reasoningEffortMapping { from to }
           }
           passThroughUserAgent
           passThroughBody
@@ -668,6 +718,12 @@ const BULK_UPDATE_CHANNEL_ORDERING_MUTATION = `
           retryableErrorPatterns {
             pattern
             regex
+          }
+          providerQuota {
+            opencodeGo {
+              workspaceId
+              authCookie
+            }
           }
         }
       }
@@ -773,6 +829,10 @@ const QUERY_CHANNELS_QUERY = `
               to
               value
               condition
+              match {
+                path
+                eq
+              }
               index
               splat
             }
@@ -783,6 +843,10 @@ const QUERY_CHANNELS_QUERY = `
               to
               value
               condition
+              match {
+                path
+                eq
+              }
               index
               splat
             }
@@ -796,6 +860,7 @@ const QUERY_CHANNELS_QUERY = `
               forceArrayInstructions
               forceArrayInputs
               replaceDeveloperRoleWithSystem
+              reasoningEffortMapping { from to }
             }
             passThroughUserAgent
             passThroughBody
@@ -810,6 +875,12 @@ const QUERY_CHANNELS_QUERY = `
             retryableErrorPatterns {
               pattern
               regex
+            }
+            providerQuota {
+              opencodeGo {
+                workspaceId
+                authCookie
+              }
             }
           }
           orderingWeight
@@ -1395,6 +1466,19 @@ export function useTestChannelAPIKeys(options?: { silent?: boolean }) {
       }
 
       toast.error(t('channels.dialogs.testAPIKeys.successSummary', { success: data.successCount, total: data.total }));
+    },
+  });
+}
+
+export function useTestChannelAPIKey() {
+  return useMutation({
+    mutationFn: async ({ channelID, key, modelID }: { channelID: string; key: string; modelID?: string }) => {
+      const data = await graphqlRequest<{ testChannelAPIKey: TestAPIKeyResult }>(TEST_CHANNEL_API_KEY_MUTATION, {
+        channelID,
+        key,
+        modelID,
+      });
+      return testAPIKeyResultSchema.parse(data.testChannelAPIKey);
     },
   });
 }

@@ -20,6 +20,7 @@ import (
 	"github.com/looplj/axonhub/llm/httpclient"
 	"github.com/looplj/axonhub/llm/transformer/anthropic/claudecode"
 	"github.com/looplj/axonhub/llm/transformer/antigravity"
+	"github.com/looplj/axonhub/llm/transformer/cline"
 	"github.com/looplj/axonhub/llm/transformer/gemini/vertex"
 	"github.com/looplj/axonhub/llm/transformer/openai/codex"
 	"github.com/looplj/axonhub/llm/transformer/openai/copilot"
@@ -177,6 +178,8 @@ func (f *ModelFetcher) getDefaultModelsByType(ctx context.Context, typ channel.T
 		return lo.Map(antigravity.DefaultModels(), func(id string, _ int) ModelIdentify { return ModelIdentify{ID: id} })
 	case channel.TypeCodex:
 		return lo.Map(codex.DefaultModels(), func(id string, _ int) ModelIdentify { return ModelIdentify{ID: id} })
+	case channel.TypeCline:
+		return lo.Map(cline.DefaultModels(), func(id string, _ int) ModelIdentify { return ModelIdentify{ID: id} })
 	case channel.TypeClaudecode:
 		return lo.Map(claudecode.DefaultModels(), func(id string, _ int) ModelIdentify { return ModelIdentify{ID: id} })
 	case channel.TypeGithubCopilot:
@@ -556,6 +559,10 @@ func (f *ModelFetcher) prepareModelsEndpoint(channelType channel.Type, baseURL s
 	case channelType.IsAnthropicLike():
 		baseURL = strings.TrimSuffix(baseURL, "/anthropic")
 		baseURL = strings.TrimSuffix(baseURL, "/claude")
+
+		if strings.HasSuffix(baseURL, "/v1") {
+			return baseURL + "/models", headers
+		}
 
 		return baseURL + "/v1/models", headers
 	case channelType.IsGemini():

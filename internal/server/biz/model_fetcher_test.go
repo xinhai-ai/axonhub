@@ -277,6 +277,18 @@ func TestPrepareModelsEndpoint(t *testing.T) {
 			expectedURL: "https://api.moonshot.cn/v1/models",
 		},
 		{
+			name:        "OpencodeGoAnthropic with /v1 suffix",
+			channelType: channel.TypeOpencodeGoAnthropic,
+			baseURL:     "https://opencode.ai/zen/go/v1",
+			expectedURL: "https://opencode.ai/zen/go/v1/models",
+		},
+		{
+			name:        "OpencodeGoAnthropic without /v1 suffix",
+			channelType: channel.TypeOpencodeGoAnthropic,
+			baseURL:     "https://opencode.ai/zen/go",
+			expectedURL: "https://opencode.ai/zen/go/v1/models",
+		},
+		{
 			name:        "Gemini with /v1 suffix",
 			channelType: channel.TypeGemini,
 			baseURL:     "https://generativelanguage.googleapis.com/v1",
@@ -652,6 +664,32 @@ func TestProviderConfFetcher_Caching(t *testing.T) {
 	thirdCallCount := int(callCount.Load())
 	if thirdCallCount != 2 {
 		t.Fatalf("expected 2 server calls after cache expiry, got %d", thirdCallCount)
+	}
+}
+
+func TestModelFetcher_ClineReturnsDefaultModels(t *testing.T) {
+	fetcher := NewModelFetcher(nil, nil)
+
+	models := fetcher.getDefaultModelsByType(context.Background(), channel.TypeCline)
+
+	if len(models) == 0 {
+		t.Fatal("expected Cline default models, got none")
+	}
+
+	modelIDs := make(map[string]struct{}, len(models))
+	for _, m := range models {
+		modelIDs[m.ID] = struct{}{}
+	}
+
+	for _, expected := range []string{
+		"cline-pass/deepseek-v4-flash",
+		"cline-pass/deepseek-v4-pro",
+		"cline-pass/qwen3.7-plus",
+		"cline-pass/kimi-k2.7-code",
+	} {
+		if _, ok := modelIDs[expected]; !ok {
+			t.Fatalf("expected model %s not found in %#v", expected, models)
+		}
 	}
 }
 
